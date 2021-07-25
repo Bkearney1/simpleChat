@@ -1,8 +1,7 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.util.ArrayList;
 
@@ -12,15 +11,13 @@ public class MultiServer{
     private Socket insocket;
     private int connectionPort;
     private String ipAddr;
-    private ArrayList<ClientThread> al;
+    public ArrayList<ClientThread> clients;
 
 
     public MultiServer(int incomingPort, String ip) throws IOException {
-        al = new ArrayList<ClientThread>();
+        clients = new ArrayList<ClientThread>();
         this.ipAddr=ip;
-
         this.connectionPort=incomingPort;
-        connectionPort=incomingPort;
         serverSocket = new ServerSocket(connectionPort);
     }
 
@@ -32,8 +29,8 @@ public class MultiServer{
                 System.out.println("With client on "+ insocket.getRemoteSocketAddress());
 
                 ClientThread t = new ClientThread(insocket);
+                clients.add(t);
                 //add this client to arraylist
-                al.add(t);
                 t.start();
 
             } catch (IOException e) {
@@ -42,35 +39,57 @@ public class MultiServer{
         }
     }
 
-    public void broadcast(){
+    public void broadcast(String message){
+        System.out.println("Client pool: "+clients.size() );
+        for (ClientThread t : clients){
+            try{
+                DataOutputStream dos =  new DataOutputStream(new BufferedOutputStream(t.getSocket().getOutputStream()));
+                dos.writeUTF(message);
+                dos.flush();
+            }catch(Exception e){
+                e.printStackTrace();
+            }
 
+        }
     }
 
     class ClientThread extends Thread{
+
+
+        //al.add(this);
         private Socket socket;
-        ClientThread(Socket socket) throws IOException {
+        ClientThread(Socket socket)  {
             this.socket = socket;
         }
+        public Socket getSocket(){
+            return this.socket;
+        }
         public void run() {
-            System.out.println("in the start method");
             try {
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                DataInputStream dis  = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
 
                 while (!socket.isClosed()) {
-                    String fromUser = in.readLine();
-                    if (fromUser != null) {
+                    String fromUser = dis.readUTF();
+                    System.out.println(fromUser);
+                    broadcast(fromUser);
+
+                    //dos.writeUTF(fromUser);
+                    //dos.flush();
+                   /* if (fromUser!=null){
                         if (fromUser.contains("q_*_disconnect_*_")) {
-                            System.out.println("USer left");
+                            System.out.println("User left");
                             socket.close();
-                            in.close();
+                            dis.close();
                             al.remove(this);
 
-                            for (ClientThread t: al){
-                                System.out.println("x");
-                            }
                         } else
-                            System.out.println(fromUser);
-                    }
+
+                            dos.writeBytes(fromUser+"\n");
+                            dos.flush();
+
+                        //broadcast(fromUser);
+
+                    }*/
                 }
 
             }catch(Exception e ){
@@ -88,7 +107,7 @@ public class MultiServer{
 
 
     public static void main(String [] args) throws IOException {
-        MultiServer server = new MultiServer( 6999, "localhost");
+        MultiServer server = new MultiServer( 7001, "localhost");
         server.listen();
     }
 }
