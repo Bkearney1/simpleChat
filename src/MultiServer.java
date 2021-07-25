@@ -5,32 +5,30 @@ import java.net.SocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.util.ArrayList;
 
-public class MultiServer{
-    private ServerSocketChannel serverSocketChannel;
+public class MultiServer {
     private ServerSocket serverSocket;
-    private Socket insocket;
-    private int connectionPort;
     private String ipAddr;
     public ArrayList<ClientThread> clients;
 
 
     public MultiServer(int incomingPort, String ip) throws IOException {
         clients = new ArrayList<ClientThread>();
-        this.ipAddr=ip;
-        this.connectionPort=incomingPort;
-        serverSocket = new ServerSocket(connectionPort);
+        this.ipAddr = "localhost";
+        serverSocket = new ServerSocket(incomingPort);
     }
 
-    public void listen(){
-        while(true){
+    //This method uses an infinite loop to listen for incoming connection requests
+    public void listen() {
+        while (true) {
             try {
+                //free up the listening socket and hand off to other thread
+                Socket comm_socket = serverSocket.accept();
+                System.out.println("With new client on " + comm_socket.getRemoteSocketAddress());
 
-                insocket = serverSocket.accept();
-                System.out.println("With client on "+ insocket.getRemoteSocketAddress());
-
-                ClientThread t = new ClientThread(insocket);
+                ClientThread t = new ClientThread(comm_socket);
                 clients.add(t);
-                //add this client to arraylist
+
+                //Start the client thread, start listening for messages from the client
                 t.start();
 
             } catch (IOException e) {
@@ -39,64 +37,55 @@ public class MultiServer{
         }
     }
 
-    public void broadcast(String message){
-        System.out.println("Client pool: "+clients.size() );
-        for (ClientThread t : clients){
-            try{
-                DataOutputStream dos =  new DataOutputStream(new BufferedOutputStream(t.getSocket().getOutputStream()));
+    //Each time a user sends a message, the server calls broadcast() to relay the message to all other clients in the pool
+    public void broadcast(String message) {
+        for (ClientThread t : clients) {
+            try {
+                DataOutputStream dos = new DataOutputStream(new BufferedOutputStream(t.getSocket().getOutputStream()));
                 dos.writeUTF(message);
                 dos.flush();
-            }catch(Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
 
         }
     }
 
-    class ClientThread extends Thread{
+    class ClientThread extends Thread {
 
-
-        //al.add(this);
         private Socket socket;
-        ClientThread(Socket socket)  {
+
+        ClientThread(Socket socket) {
             this.socket = socket;
         }
-        public Socket getSocket(){
+
+        public Socket getSocket() {
             return this.socket;
         }
+
         public void run() {
             try {
-                DataInputStream dis  = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+                DataInputStream dis = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
 
                 while (!socket.isClosed()) {
                     String fromUser = dis.readUTF();
                     System.out.println(fromUser);
-                    broadcast(fromUser);
-
-                    //dos.writeUTF(fromUser);
-                    //dos.flush();
-                   /* if (fromUser!=null){
-                        if (fromUser.contains("q_*_disconnect_*_")) {
-                            System.out.println("User left");
-                            socket.close();
-                            dis.close();
-                            al.remove(this);
-
-                        } else
-
-                            dos.writeBytes(fromUser+"\n");
-                            dos.flush();
-
-                        //broadcast(fromUser);
-
-                    }*/
+                    if (fromUser.contains("::__QUIT")) {
+                        broadcast(fromUser.split("::__")[0] + " is now leaving the chat.\nGoodbye!");
+                        clients.remove(this);
+                        dis.close();
+                        socket.close();
+                        this.stop();
+                    } else {
+                        broadcast(fromUser);
+                    }
+                    System.out.println("Client pool: " + clients.size());
                 }
 
-            }catch(Exception e ){
+            } catch (Exception e) {
                 e.printStackTrace();
-            }finally {
+            } finally {
                 try {
-
                     socket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -106,8 +95,8 @@ public class MultiServer{
     }
 
 
-    public static void main(String [] args) throws IOException {
-        MultiServer server = new MultiServer( 7001, "localhost");
+    public static void main(String[] args) throws IOException {
+        MultiServer server = new MultiServer(7001, "localhost");
         server.listen();
     }
 }

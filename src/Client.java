@@ -10,11 +10,11 @@ public class Client {
     private String username;
     Scanner keyboard;
 
-    public Client(int port, String ip){
+    public Client(int port, String ip) {
 
         keyboard = new Scanner(System.in);
         System.out.print("Please input username: ");
-        this.username=keyboard.nextLine();
+        this.username = keyboard.nextLine();
         try {
             socket = new Socket(ip, port);
             readThread t = new readThread(socket);
@@ -24,59 +24,57 @@ public class Client {
             //BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             DataOutputStream dos = new DataOutputStream((socket.getOutputStream()));
 
-            while(true){
+            while (!socket.isClosed()) {
 
-                try{
+                try {
                     System.out.print(">");
-                    String user_in =  keyboard.nextLine();
-                    dos.writeUTF("["+username+"]: " + user_in);
-                    //sleep(1);
-                    dos.flush();
+                    String user_in = keyboard.nextLine();
+
+                    if (user_in.equalsIgnoreCase("q")) {
+                        System.out.println("quitting");
+                        user_in = username + "::__QUIT";
+                        dos.writeUTF(user_in);
+                        dos.flush();
+                        t.stop();
+                        socket.close();
+
+                    } else {
+                        dos.writeUTF("[" + username + "]: " + user_in);
+                        //sleep(1);
+                        dos.flush();
+                    }
 
 
-                }catch (Exception e){
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
-
-
-
-                ///if(!user_in.equalsIgnoreCase("Q")) {
-               ///     dos.write(( +"\n").getBytes());
-               ///     dos.flush();
-               /// }
-
-               /* if(user_in.equalsIgnoreCase("Q")){
-                    dos.write(("["+username+"]: " + user_in +"_*_disconnect_*_\n").getBytes());
-                    dos.close();
-                    socket.close();
-                    System.out.println("Quitting");
-                }*/
             }
 
 
-        } catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
 
-    public static void main(String [] args){
-        new Client(7001,"localhost");
+    public static void main(String[] args) {
+        new Client(7001, "localhost");
 
     }
 
-    public class readThread extends Thread{
-        private Socket socket;
+    public class readThread extends Thread {
         private DataInputStream dis;
+
         public readThread(Socket _socket) throws IOException {
-            this.socket = _socket;
-            dis = new DataInputStream(socket.getInputStream());
+            dis = new DataInputStream(_socket.getInputStream());
 
         }
+
+
         public void run() {
-            while(true) {
+            while (!socket.isClosed()) {
                 try {
-                    System.out.println("\r"+this.dis.readUTF()+"\r");
+                    System.out.println("\r" + this.dis.readUTF() + "\r");
                     System.out.print(">");
                     //dis.close();
                 } catch (IOException e) {
